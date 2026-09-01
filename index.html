@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard สรุปทรัพย์สินและแผนเกษียณอายุ</title>
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for Donut Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Tailwind CSS for Modern UI -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        .toggle-btn { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen p-4 sm:p-6 lg:p-8">
+
+    <div class="max-w-[1400px] mx-auto space-y-6">
+        
+        <!-- Header -->
+        <header class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">📊 Wealth & Retirement Dashboard</h1>
+                <p class="text-sm text-slate-500">ระบบสรุปภาพรวมทรัพย์สิน แผนการลงทุนรายเดือน และพยากรณ์การเติบโต</p>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-2 w-full xl:w-auto">
+                <button onclick="shareSummary()" type="button" class="flex-1 xl:flex-none px-4 py-2 bg-black text-white hover:bg-gray-800 font-medium text-xs sm:text-sm rounded-xl transition duration-200 flex items-center justify-center gap-1 cursor-pointer shadow">
+                    <span>📋</span> แชร์/คัดลอกสรุป
+                </button>
+
+                <button onclick="document.getElementById('importFile').click()" type="button" class="flex-1 xl:flex-none px-4 py-2 bg-slate-50 text-slate-700 hover:bg-slate-100 font-medium text-xs sm:text-sm rounded-xl transition duration-200 border border-slate-200 flex items-center justify-center gap-1 cursor-pointer">
+                    <span>📥</span> Import JSON
+                </button>
+                <input type="file" id="importFile" class="hidden" accept=".json" onchange="importJSON(event)">
+                
+                <button onclick="exportJSON()" type="button" class="flex-1 xl:flex-none px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium text-xs sm:text-sm rounded-xl transition duration-200 border border-blue-200 flex items-center justify-center gap-1 cursor-pointer">
+                    <span>📤</span> Export JSON
+                </button>
+                
+                <button onclick="clearData()" type="button" class="flex-1 xl:flex-none px-4 py-2 bg-white border border-red-500 text-red-500 hover:bg-red-50 font-medium text-xs sm:text-sm rounded-xl transition duration-200 flex items-center justify-center gap-1 cursor-pointer shadow-sm">
+                    <span>🗑️</span> ล้างค่า
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Column: Inputs -->
+            <div class="lg:col-span-6 space-y-6">
+                
+                <!-- Section 1: Retirement & Income Info -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <h2 class="text-lg font-semibold text-slate-800">⏳ ข้อมูลส่วนบุคคลและรายได้</h2>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs font-medium text-slate-500">ข้อมูล ณ เดือน/ปี:</label>
+                            <input type="month" id="dataAsOf" oninput="saveAndCalculate()" class="text-sm px-2 py-1 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1">วัน/เดือน/ปีเกิด</label>
+                            <input type="date" id="birthDate" oninput="saveAndCalculate()" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-600 mb-1">อายุเกษียณ (ปี)</label>
+                            <input type="text" inputmode="decimal" id="retirementAge" value="60.00" onfocus="onInputFocus(this)" onblur="onInputBlur(this, true)" oninput="onInputChange(this)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50" placeholder="60.00">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1">เงินเดือนปัจจุบัน (บาท) <span class="text-xs text-slate-400 font-normal">*ใช้คำนวณ PVD</span></label>
+                        <input type="text" inputmode="decimal" id="salary" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50" placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- Section 2: Assets Info & DCA -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-5">
+                    <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">💰 รายละเอียดทรัพย์สินและ DCA ในพอร์ตหลัก</h2>
+                    
+                    <!-- PVD Section -->
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
+                        <label class="block text-sm font-semibold text-slate-700">กองทุนสำรองเลี้ยงชีพ (PVD)</label>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">ยอดปัจจุบัน (บาท)</label>
+                                <input type="text" inputmode="decimal" id="pvd_current" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">พนักงานหัก (%)</label>
+                                <input type="text" inputmode="decimal" id="pvd_emp" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">บริษัทสมทบ (%)</label>
+                                <input type="text" inputmode="decimal" id="pvd_employer" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-violet-600 mb-1">ผลตอบแทน/ปี (%)</label>
+                                <input type="text" inputmode="decimal" id="pvd_yield" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50/50 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="0.00">
+                                <label class="flex items-center gap-1 mt-1.5 cursor-pointer">
+                                    <input type="checkbox" id="pvd_is_compound" checked onchange="saveAndCalculate()" class="w-3 h-3 text-blue-600 rounded cursor-pointer">
+                                    <span class="text-[10px] text-slate-500 select-none">ทบต้น</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-xs text-blue-600 font-medium text-right" id="txtPvdTotalMonthly">ยอดเข้ากองทุนรวม: 0.00 บาท/เดือน</div>
+                    </div>
+
+                    <!-- Other Assets (Standard DCA) -->
+                    <div class="space-y-4">
+                        <!-- Cash -->
+                        <div class="grid grid-cols-3 gap-3 items-start">
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-slate-500 mb-1">เงินสด ปัจจุบัน</label>
+                                <input type="text" inputmode="decimal" id="cash_current" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-emerald-600 mb-1">DCA/เดือน</label>
+                                <input type="text" inputmode="decimal" id="cash_dca" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-violet-600 mb-1">ดอกเบี้ย/ปี (%)</label>
+                                <input type="text" inputmode="decimal" id="cash_yield" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50/50 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="0.00">
+                                <label class="flex items-center gap-1 mt-1.5 cursor-pointer">
+                                    <input type="checkbox" id="cash_is_compound" checked onchange="saveAndCalculate()" class="w-3 h-3 text-blue-600 rounded cursor-pointer">
+                                    <span class="text-[10px] text-slate-500 select-none">ทบต้น</span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- Coop -->
+                        <div class="grid grid-cols-3 gap-3 items-start">
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-slate-500 mb-1">สหกรณ์ ปัจจุบัน</label>
+                                <input type="text" inputmode="decimal" id="coop_current" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-emerald-600 mb-1">DCA/เดือน</label>
+                                <input type="text" inputmode="decimal" id="coop_dca" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-violet-600 mb-1">ปันผล/ปี (%)</label>
+                                <input type="text" inputmode="decimal" id="coop_yield" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50/50 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="0.00">
+                                <label class="flex items-center gap-1 mt-1.5 cursor-pointer">
+                                    <input type="checkbox" id="coop_is_compound" onchange="saveAndCalculate()" class="w-3 h-3 text-blue-600 rounded cursor-pointer">
+                                    <span class="text-[10px] text-slate-500 select-none">ทบต้น</span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- RMF -->
+                        <div class="grid grid-cols-3 gap-3 items-start">
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-slate-500 mb-1">RMF ปัจจุบัน</label>
+                                <input type="text" inputmode="decimal" id="rmf_current" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-emerald-600 mb-1">DCA/เดือน</label>
+                                <input type="text" inputmode="decimal" id="rmf_dca" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-violet-600 mb-1">ผลตอบแทน/ปี (%)</label>
+                                <input type="text" inputmode="decimal" id="rmf_yield" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50/50 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="0.00">
+                                <label class="flex items-center gap-1 mt-1.5 cursor-pointer">
+                                    <input type="checkbox" id="rmf_is_compound" checked onchange="saveAndCalculate()" class="w-3 h-3 text-blue-600 rounded cursor-pointer">
+                                    <span class="text-[10px] text-slate-500 select-none">ทบต้น</span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- SSF -->
+                        <div class="grid grid-cols-3 gap-3 items-start">
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-slate-500 mb-1">SSF ปัจจุบัน</label>
+                                <input type="text" inputmode="decimal" id="ssf_current" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-emerald-600 mb-1">DCA/เดือน</label>
+                                <input type="text" inputmode="decimal" id="ssf_dca" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-violet-600 mb-1">ผลตอบแทน/ปี (%)</label>
+                                <input type="text" inputmode="decimal" id="ssf_yield" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50/50 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="0.00">
+                                <label class="flex items-center gap-1 mt-1.5 cursor-pointer">
+                                    <input type="checkbox" id="ssf_is_compound" checked onchange="saveAndCalculate()" class="w-3 h-3 text-blue-600 rounded cursor-pointer">
+                                    <span class="text-[10px] text-slate-500 select-none">ทบต้น</span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- Thai ESG -->
+                        <div class="grid grid-cols-3 gap-3 items-start">
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-slate-500 mb-1">Thai ESG ปัจจุบัน</label>
+                                <input type="text" inputmode="decimal" id="thaiesg_current" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-emerald-600 mb-1">DCA/เดือน</label>
+                                <input type="text" inputmode="decimal" id="thaiesg_dca" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] sm:text-xs font-medium text-violet-600 mb-1">ผลตอบแทน/ปี (%)</label>
+                                <input type="text" inputmode="decimal" id="thaiesg_yield" onfocus="onInputFocus(this)" onblur="onInputBlur(this, false)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50/50 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="0.00">
+                                <label class="flex items-center gap-1 mt-1.5 cursor-pointer">
+                                    <input type="checkbox" id="thaiesg_is_compound" checked onchange="saveAndCalculate()" class="w-3 h-3 text-blue-600 rounded cursor-pointer">
+                                    <span class="text-[10px] text-slate-500 select-none">ทบต้น</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Custom Simulator (Playground) -->
+                <div class="bg-indigo-50/40 rounded-2xl p-6 shadow-sm border border-indigo-100 space-y-4 border-l-4 border-l-indigo-400">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-indigo-200 pb-3">
+                        <div>
+                            <h2 class="text-lg font-semibold text-indigo-800">🛠️ เครื่องคิดเลขจำลอง (Playground)</h2>
+                            <p class="text-xs text-slate-500">ทดลองตัวเลขเล่นๆ หรือจะกดรวมในพอร์ตหลักก็ได้</p>
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-indigo-200 shadow-sm hover:bg-indigo-50 transition w-fit">
+                            <input type="checkbox" id="custom_include" onchange="saveAndCalculate()" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+                            <span class="text-xs font-bold text-indigo-700 select-none">นำไปรวมในพอร์ตหลักด้วย</span>
+                        </label>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div class="col-span-2 sm:col-span-4">
+                            <label class="block text-xs font-medium text-slate-500 mb-1">ชื่อรายการ (ตั้งเองได้เลย)</label>
+                            <input type="text" id="custom_name" oninput="saveAndCalculate()" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white" placeholder="เช่น จำลองกองทุนต่างประเทศ" value="พอร์ตจำลอง">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">เงินต้น</label>
+                            <input type="text" inputmode="decimal" id="custom_current" onfocus="onInputFocus(this)" onblur="onInputBlur(this)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-emerald-600 mb-1">DCA/เดือน</label>
+                            <input type="text" inputmode="decimal" id="custom_dca" onfocus="onInputFocus(this)" onblur="onInputBlur(this)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50/30 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-violet-600 mb-1">ผลตอบแทน/ปี (%)</label>
+                            <input type="text" inputmode="decimal" id="custom_yield" onfocus="onInputFocus(this)" onblur="onInputBlur(this)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50/50 focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="0.00">
+                            <label class="flex items-center gap-1 mt-1.5 cursor-pointer">
+                                <input type="checkbox" id="custom_is_compound" checked onchange="saveAndCalculate()" class="w-3 h-3 text-indigo-600 rounded cursor-pointer">
+                                <span class="text-[10px] text-slate-500 select-none">ทบต้น</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-amber-600 mb-1">ระยะเวลา (ปี)</label>
+                            <input type="text" inputmode="decimal" id="custom_years" onfocus="onInputFocus(this)" onblur="onInputBlur(this)" oninput="onInputChange(this)" class="w-full px-3 py-2 rounded-lg border border-amber-200 bg-amber-50/50 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm" placeholder="0.00">
+                            <span class="text-[9px] text-slate-400 mt-1 block leading-tight">*ใช้คำนวณผลลัพธ์แยกกล่องนี้</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Playground Result Box -->
+                    <div class="mt-2 bg-white p-4 rounded-xl border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+                        <div class="text-sm font-medium text-slate-600">🎯 มูลค่าจำลองในอนาคต:</div>
+                        <div class="text-right">
+                            <span class="text-xl font-bold text-indigo-700" id="customResultTotal">0.00</span>
+                            <span class="text-sm text-slate-500 ml-1">บาท</span>
+                            <div class="text-xs text-emerald-600 font-medium">ส่วนที่เป็นกำไร <span id="customResultProfit">+0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Summary & Analytics -->
+            <div class="lg:col-span-6 space-y-6">
+                
+                <!-- Top Summary Cards -->
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Age -->
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                        <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">อายุปัจจุบัน</span>
+                        <div class="mt-2 flex items-baseline gap-1">
+                            <span id="txtAgeYears" class="text-2xl font-bold text-slate-900">-</span><span class="text-sm text-slate-500">ปี</span>
+                            <span id="txtAgeMonths" class="text-2xl font-bold text-slate-900 ml-1">-</span><span class="text-sm text-slate-500">เดือน</span>
+                        </div>
+                    </div>
+                    <!-- Remaining Time -->
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                        <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">เวลาทำงานที่เหลือ</span>
+                        <div class="mt-2 flex items-baseline gap-1">
+                            <span id="txtRemYears" class="text-2xl font-bold text-blue-600">-</span><span class="text-sm text-slate-500">ปี</span>
+                            <span id="txtRemMonths" class="text-2xl font-bold text-blue-600 ml-1">-</span><span class="text-sm text-slate-500">เดือน</span>
+                        </div>
+                    </div>
+                    <!-- Total Net Worth -->
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100 bg-emerald-50/20">
+                        <span class="text-xs font-medium text-emerald-600 uppercase tracking-wider">ทรัพย์สินสุทธิ (ณ ปัจจุบัน)</span>
+                        <div class="mt-2">
+                            <span id="txtTotalNetWorth" class="text-2xl font-bold text-emerald-700">0.00</span>
+                            <span class="text-xs text-slate-500 ml-1">บาท</span>
+                        </div>
+                    </div>
+                    <!-- Total DCA per month -->
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-blue-100 bg-blue-50/20">
+                        <span class="text-xs font-medium text-blue-600 uppercase tracking-wider">เงินลงทุนรวม (DCA)</span>
+                        <div class="mt-2">
+                            <span id="txtTotalDCA" class="text-2xl font-bold text-blue-700">0.00</span>
+                            <span class="text-xs text-slate-500 ml-1">บ./เดือน</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Donut Chart Card -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center">
+                    <div class="w-full flex justify-between items-center mb-4 border-b pb-2">
+                        <h3 class="text-lg font-semibold text-slate-800">📈 สัดส่วนทรัพย์สินปัจจุบัน (Asset Allocation)</h3>
+                    </div>
+                    <div class="w-full max-w-xs sm:max-w-sm h-64 relative flex justify-center items-center">
+                        <canvas id="assetChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Breakdown Table -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">📋 รายละเอียดเชิงตัวเลข</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-xs text-slate-400 uppercase tracking-wider">
+                                    <th class="py-3 px-2 font-semibold">ประเภททรัพย์สิน</th>
+                                    <th class="py-3 px-2 font-semibold text-right">มูลค่า (บาท)</th>
+                                    <th class="py-3 px-2 font-semibold text-right text-emerald-600">DCA/ด</th>
+                                    <th class="py-3 px-2 font-semibold text-right text-violet-600">Yield</th>
+                                </tr>
+                            </thead>
+                            <tbody id="breakdownTableBody" class="text-sm divide-y divide-slate-50">
+                                <!-- JavaScript will inject rows here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Full Width Column: Forecast Section -->
+            <div class="lg:col-span-12">
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
+                    
+                    <!-- Forecast Header & Toggles -->
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-slate-100 pb-4 gap-4">
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-800">🔮 คาดการณ์พอร์ตการลงทุนรวมทั้งหมด</h2>
+                            <p class="text-xs text-slate-500 mt-1" id="fcSubtitle">คำนวณแยก "ต้นทุนที่เติมเข้าไป" และ "ผลตอบแทนคาดการณ์"</p>
+                        </div>
+                        
+                        <!-- Toggle Switch Nominal vs Real -->
+                        <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                            <button id="btnToggleNominal" onclick="setForecastMode('nominal')" class="toggle-btn px-4 py-1.5 text-sm font-semibold rounded-lg bg-white shadow-sm text-slate-800 cursor-pointer">
+                                ตามตัวเลข (Nominal)
+                            </button>
+                            <button id="btnToggleReal" onclick="setForecastMode('real')" class="toggle-btn px-4 py-1.5 text-sm font-semibold rounded-lg text-slate-500 hover:text-slate-700 cursor-pointer">
+                                อำนาจซื้อจริง (Real)
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Forecast Controls -->
+                    <div class="flex flex-col md:flex-row md:items-end gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">เลือกเดือน/ปี ที่ต้องการดู</label>
+                            <input type="month" id="forecastDate" oninput="saveAndCalculate()" class="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">เงินเฟ้อคาดการณ์/ปี (%)</label>
+                            <input type="text" inputmode="decimal" id="inflationRate" value="3.00" onfocus="onInputFocus(this)" onblur="onInputBlur(this, true)" oninput="onInputChange(this)" class="w-full sm:w-24 px-4 py-2 rounded-xl border border-rose-200 bg-rose-50/50 focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-sm text-center">
+                        </div>
+
+                        <div class="pb-2 md:ml-auto">
+                            <span id="txtDiffMonths" class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 shadow-sm border border-blue-200">
+                                ระยะเวลาสะสม: 0 เดือน
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto mt-4">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-[11px] sm:text-xs text-slate-500 uppercase tracking-wider bg-slate-50">
+                                    <th class="py-3 px-4 font-semibold rounded-tl-lg">ประเภททรัพย์สิน</th>
+                                    <th class="py-3 px-4 font-semibold text-right">ต้นทุนรวม (เงินต้น)</th>
+                                    <th class="py-3 px-4 font-semibold text-right text-violet-600">+ ผลตอบแทน</th>
+                                    <th class="py-3 px-4 font-semibold text-right text-blue-700 rounded-tr-lg" id="fcHeaderFinalValue">มูลค่ารวมสุทธิ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forecastTableBody" class="text-sm divide-y divide-slate-100">
+                                <!-- JavaScript will inject rows here -->
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-slate-50 border-t-2 border-slate-200 font-bold text-slate-800 text-sm">
+                                    <td class="py-4 px-4 rounded-bl-lg text-slate-600 uppercase text-xs tracking-wider">รวมทั้งหมด (Total)</td>
+                                    <td class="py-4 px-4 text-right" id="fcTotalPrincipal">0.00</td>
+                                    <td class="py-4 px-4 text-right text-violet-600" id="fcTotalInterest">0.00</td>
+                                    <td class="py-4 px-4 text-right text-blue-700 rounded-br-lg text-base sm:text-lg" id="fcTotalForecast">0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        const inputIds = [
+            'dataAsOf', 'birthDate', 'retirementAge', 'salary', 
+            'cash_current', 'cash_dca', 'cash_yield', 'cash_is_compound',
+            'pvd_current', 'pvd_emp', 'pvd_employer', 'pvd_yield', 'pvd_is_compound',
+            'coop_current', 'coop_dca', 'coop_yield', 'coop_is_compound',
+            'rmf_current', 'rmf_dca', 'rmf_yield', 'rmf_is_compound',
+            'ssf_current', 'ssf_dca', 'ssf_yield', 'ssf_is_compound',
+            'thaiesg_current', 'thaiesg_dca', 'thaiesg_yield', 'thaiesg_is_compound',
+            'forecastDate', 'inflationRate',
+            'custom_name', 'custom_current', 'custom_dca', 'custom_yield', 'custom_is_compound', 'custom_years', 'custom_include'
+        ];
+        
+        let assetChart = null;
+        let forecastMode = 'nominal';
+
+        window.onload = function() {
+            loadData();
+            const dataAsOfEl = document.getElementById('dataAsOf');
+            if (dataAsOfEl && !dataAsOfEl.value) {
+                const today = new Date();
+                dataAsOfEl.value = today.toISOString().slice(0, 7);
+            }
+
+            initChart();
+            calculateAll();
+        };
+
+        function shareSummary() {
+            const dataAsOf = document.getElementById('dataAsOf').value || '-';
+            const ageYears = document.getElementById('txtAgeYears').innerText;
+            const ageMonths = document.getElementById('txtAgeMonths').innerText;
+            const remYears = document.getElementById('txtRemYears').innerText;
+            const remMonths = document.getElementById('txtRemMonths').innerText;
+            const totalNet = document.getElementById('txtTotalNetWorth').innerText;
+            const totalDCA = document.getElementById('txtTotalDCA').innerText;
+            const forecastDate = document.getElementById('forecastDate').value || 'ยังไม่กำหนด';
+            const totalPrincipal = document.getElementById('fcTotalPrincipal').innerText;
+            const totalInterest = document.getElementById('fcTotalInterest').innerText;
+            const totalForecast = document.getElementById('fcTotalForecast').innerText;
+            const modeText = forecastMode === 'nominal' ? 'ตามตัวเลข (Nominal)' : 'อำนาจซื้อจริง (Real)';
+
+            let noteText = `📊 สรุปพอร์ตความมั่งคั่งและแผนเกษียณ\n`;
+            noteText += `📅 ข้อมูล ณ เดือน: ${dataAsOf}\n`;
+            noteText += `----------------------------------\n`;
+            noteText += `👤 อายุปัจจุบัน: ${ageYears} ปี ${ageMonths} เดือน\n`;
+            noteText += `⏳ เวลาทำงานก่อนเกษียณ: ${remYears} ปี ${remMonths} เดือน\n`;
+            noteText += `💰 ทรัพย์สินสุทธิรวม: ${totalNet} บาท\n`;
+            noteText += `📈 เงินลงทุนรวม (DCA): ${totalDCA} บาท/เดือน\n`;
+            noteText += `----------------------------------\n`;
+            noteText += `🔮 คาดการณ์ ณ เดือน/ปี: ${forecastDate} (${modeText})\n`;
+            noteText += `• ต้นทุนรวม (เงินต้น): ${totalPrincipal} บาท\n`;
+            noteText += `• ผลตอบแทนคาดการณ์: ${totalInterest} บาท\n`;
+            noteText += `• มูลค่ารวมสุทธิ: ${totalForecast} บาท\n`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: `สรุปพอร์ตความมั่งคั่ง`,
+                    text: noteText
+                }).catch(err => console.log('Share canceled', err));
+            } else {
+                navigator.clipboard.writeText(noteText).then(() => {
+                    alert('✅ คัดลอกข้อมูลสรุปเรียบร้อย!\nคุณสามารถเปิดแอป Apple Notes แล้วกดวาง (Paste) ได้เลยครับ');
+                }).catch(err => {
+                    alert('❌ ไม่สามารถคัดลอกได้ กรุณาลองใหม่อีกครั้ง');
+                });
+            }
+        }
+
+        function exportJSON() {
+            saveData();
+            let data = {};
+            inputIds.forEach(id => {
+                let el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') data[id] = el.checked;
+                    else data[id] = el.value;
+                }
+            });
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            let dateSuffix = data['dataAsOf'] ? data['dataAsOf'] : 'export';
+            let fileName = `wealth_summary_${dateSuffix}.json`;
+
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS) {
+                window.open(url, '_blank');
+                return;
+            }
+
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = fileName;
+            
+            document.body.appendChild(a);
+            try { a.click(); } catch (err) { window.open(url, '_blank'); }
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 1000);
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    inputIds.forEach(id => {
+                        if(data[id] !== undefined) {
+                            let el = document.getElementById(id);
+                            if(el) {
+                                if (el.type === 'checkbox') {
+                                    el.checked = data[id];
+                                    localStorage.setItem(id, data[id]);
+                                } else {
+                                    el.value = data[id];
+                                    localStorage.setItem(id, data[id]);
+                                }
+                            }
+                        }
+                    });
+                    saveAndCalculate();
+                    alert('✅ นำเข้าข้อมูลสำเร็จ!');
+                } catch(err) {
+                    alert('❌ รูปแบบไฟล์ไม่ถูกต้อง');
+                }
+                document.getElementById('importFile').value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function setForecastMode(mode) {
+            forecastMode = mode;
+            const btnNom = document.getElementById('btnToggleNominal');
+            const btnReal = document.getElementById('btnToggleReal');
+            const fcHeader = document.getElementById('fcHeaderFinalValue');
+            const fcSub = document.getElementById('fcSubtitle');
+
+            if (mode === 'nominal') {
+                btnNom.className = "toggle-btn px-4 py-1.5 text-sm font-semibold rounded-lg bg-white shadow-sm text-slate-800 cursor-pointer";
+                btnReal.className = "toggle-btn px-4 py-1.5 text-sm font-semibold rounded-lg text-slate-500 hover:text-slate-700 cursor-pointer";
+                fcHeader.innerText = "มูลค่ารวมสุทธิ (Nominal)";
+                fcSub.innerText = "คำนวณแยก ต้นทุน และ ผลตอบแทนคาดการณ์ (ตามตัวเลขเงินสดจริง)";
+            } else {
+                btnReal.className = "toggle-btn px-4 py-1.5 text-sm font-semibold rounded-lg bg-white shadow-sm text-slate-800 cursor-pointer";
+                btnNom.className = "toggle-btn px-4 py-1.5 text-sm font-semibold rounded-lg text-slate-500 hover:text-slate-700 cursor-pointer";
+                fcHeader.innerText = "มูลค่าสุทธิ (อำนาจซื้อจริง)";
+                fcSub.innerText = "หักล้างเงินเฟ้อออกแล้ว เพื่อให้เห็น 'อำนาจซื้อ' เทียบเท่าค่าเงินในยุคปัจจุบัน";
+            }
+            saveAndCalculate();
+        }
+
+        function saveAndCalculate() {
+            saveData();
+            calculateAll();
+        }
+
+        function onInputChange(el) {
+            if(el.id === 'custom_name') { saveAndCalculate(); return; } // ไม่ต้องดักตัวเลขสำหรับช่องชื่อ
+            let val = el.value.replace(/[^0-9.]/g, '');
+            const dotCount = (val.match(/\./g) || []).length;
+            if (dotCount > 1) val = val.substring(0, val.length - 1);
+            el.value = val;
+            saveAndCalculate();
+        }
+
+        function parseRawValue(val) {
+            if (!val) return 0;
+            const cleaned = val.toString().replace(/,/g, '');
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        function formatTwoDecimals(val) {
+            const num = parseFloat(val);
+            if (isNaN(num)) return '0.00';
+            return num.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function onInputFocus(el) {
+            if(el.id === 'custom_name') return; // ข้ามการ clear ลูกน้ำสำหรับช่องข้อความ
+            const raw = parseRawValue(el.value);
+            el.value = raw === 0 ? '' : raw.toString();
+        }
+
+        function onInputBlur(el, isInteger = false) {
+            if(el.id === 'custom_name') { saveAndCalculate(); return; }
+            const raw = parseRawValue(el.value);
+            el.value = formatTwoDecimals(raw);
+            saveAndCalculate();
+        }
+
+        function saveData() {
+            inputIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') {
+                        localStorage.setItem(id, el.checked);
+                    } else if (el.type === 'text' && id === 'custom_name') {
+                        localStorage.setItem(id, el.value);
+                    } else if (id === 'birthDate' || id === 'forecastDate' || id === 'dataAsOf') {
+                        localStorage.setItem(id, el.value);
+                    } else {
+                        localStorage.setItem(id, parseRawValue(el.value));
+                    }
+                }
+            });
+        }
+
+        function loadData() {
+            inputIds.forEach(id => {
+                const saved = localStorage.getItem(id);
+                const el = document.getElementById(id);
+                if (!el) return;
+                
+                if (saved !== null && saved !== '') {
+                    if (el.type === 'checkbox') {
+                        el.checked = (saved === 'true');
+                    } else if (el.type === 'text' && id === 'custom_name') {
+                        el.value = saved;
+                    } else if (id === 'birthDate' || id === 'forecastDate' || id === 'dataAsOf') {
+                        el.value = saved;
+                    } else {
+                        el.value = formatTwoDecimals(saved);
+                    }
+                } else {
+                    if (el.type === 'checkbox') {
+                        el.checked = true; // ค่าเริ่มต้นให้ทบต้นทั้งหมด
+                        if (id === 'coop_is_compound') el.checked = false; // ยกเว้นสหกรณ์ให้ค่าเริ่มต้นเป็น ไม่ทบต้น
+                        if (id === 'custom_include') el.checked = false; // ค่าเริ่มต้นของพอร์ตจำลองคือไม่เอามารวม
+                    } else if (el.type === 'text' && id === 'custom_name') {
+                        el.value = 'พอร์ตจำลอง';
+                    } else if (id === 'retirementAge') { el.value = '60.00'; }
+                    else if (id === 'inflationRate') { el.value = '3.00'; }
+                    else if (id === 'custom_years') { el.value = '20.00'; }
+                    else if (id !== 'birthDate' && id !== 'forecastDate' && id !== 'dataAsOf') {
+                        el.value = '0.00';
+                    }
+                }
+            });
+        }
+
+        function clearData() {
+            setTimeout(() => {
+                if (window.confirm('ยืนยันการล้างข้อมูลทั้งหมด?\n(ข้อมูลที่บันทึกไว้ในเครื่องจะถูกรีเซ็ตเป็นค่าเริ่มต้น)')) {
+                    inputIds.forEach(id => {
+                        localStorage.removeItem(id);
+                        const el = document.getElementById(id);
+                        if (el) {
+                            if (el.type === 'checkbox') {
+                                el.checked = true;
+                                if (id === 'coop_is_compound') el.checked = false;
+                                if (id === 'custom_include') el.checked = false;
+                            } else if (el.type === 'text' && id === 'custom_name') {
+                                el.value = 'พอร์ตจำลอง';
+                            } else if (id === 'birthDate' || id === 'forecastDate' || id === 'dataAsOf') {
+                                el.value = '';
+                            } else if (id === 'retirementAge') { el.value = '60.00'; }
+                            else if (id === 'inflationRate') { el.value = '3.00'; }
+                            else if (id === 'custom_years') { el.value = '20.00'; }
+                            else { el.value = '0.00'; }
+                        }
+                    });
+                    
+                    const today = new Date();
+                    const dataAsOfEl = document.getElementById('dataAsOf');
+                    if(dataAsOfEl) dataAsOfEl.value = today.toISOString().slice(0, 7);
+                    saveAndCalculate();
+                }
+            }, 50);
+        }
+
+        function calculateAll() {
+            calculateAgeAndTime();
+            const assets = updatePortfolio();
+            calculateForecast(assets);
+            calculateCustomPlayground(); // จำลองผลลัพธ์พอร์ตย่อย
+        }
+
+        function calculateAgeAndTime() {
+            const birthDateVal = document.getElementById('birthDate').value;
+            const retirementAgeVal = parseRawValue(document.getElementById('retirementAge').value);
+
+            const txtAgeYears = document.getElementById('txtAgeYears');
+            const txtAgeMonths = document.getElementById('txtAgeMonths');
+            const txtRemYears = document.getElementById('txtRemYears');
+            const txtRemMonths = document.getElementById('txtRemMonths');
+
+            if (!birthDateVal) {
+                txtAgeYears.innerText = '-';
+                txtAgeMonths.innerText = '-';
+                txtRemYears.innerText = '-';
+                txtRemMonths.innerText = '-';
+                return;
+            }
+
+            const birthDate = new Date(birthDateVal);
+            const today = new Date();
+
+            let totalMonths = (today.getFullYear() - birthDate.getFullYear()) * 12;
+            totalMonths -= birthDate.getMonth();
+            totalMonths += today.getMonth();
+            if (today.getDate() < birthDate.getDate()) { totalMonths--; }
+
+            let currentAgeYears = Math.floor(totalMonths / 12);
+            let currentAgeMonths = totalMonths % 12;
+            if (currentAgeYears < 0) { currentAgeYears = 0; currentAgeMonths = 0; totalMonths = 0; }
+
+            let targetTotalMonths = Math.round(retirementAgeVal * 12);
+            let remTotalMonths = targetTotalMonths - totalMonths;
+            if (remTotalMonths < 0) remTotalMonths = 0;
+
+            let remYears = Math.floor(remTotalMonths / 12);
+            let remMonths = remTotalMonths % 12;
+
+            txtAgeYears.innerText = currentAgeYears;
+            txtAgeMonths.innerText = currentAgeMonths;
+            txtRemYears.innerText = remYears;
+            txtRemMonths.innerText = remMonths;
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('assetChart').getContext('2d');
+            assetChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [], // กำหนดผ่าน updatePortfolio
+                    datasets: [{
+                        data: [], // กำหนดผ่าน updatePortfolio
+                        backgroundColor: [],
+                        borderWidth: 2, borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 11 }, boxWidth: 12, padding: 15 } } },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        function updatePortfolio() {
+            const cash = parseRawValue(document.getElementById('cash_current').value);
+            const cash_dca = parseRawValue(document.getElementById('cash_dca').value);
+            const cash_yield = parseRawValue(document.getElementById('cash_yield').value);
+            const cash_is_compound = document.getElementById('cash_is_compound').checked;
+
+            const pvd = parseRawValue(document.getElementById('pvd_current').value);
+            const pvd_yield = parseRawValue(document.getElementById('pvd_yield').value);
+            const pvd_is_compound = document.getElementById('pvd_is_compound').checked;
+            
+            const coop = parseRawValue(document.getElementById('coop_current').value);
+            const coop_dca = parseRawValue(document.getElementById('coop_dca').value);
+            const coop_yield = parseRawValue(document.getElementById('coop_yield').value);
+            const coop_is_compound = document.getElementById('coop_is_compound').checked;
+
+            const rmf = parseRawValue(document.getElementById('rmf_current').value);
+            const rmf_dca = parseRawValue(document.getElementById('rmf_dca').value);
+            const rmf_yield = parseRawValue(document.getElementById('rmf_yield').value);
+            const rmf_is_compound = document.getElementById('rmf_is_compound').checked;
+
+            const ssf = parseRawValue(document.getElementById('ssf_current').value);
+            const ssf_dca = parseRawValue(document.getElementById('ssf_dca').value);
+            const ssf_yield = parseRawValue(document.getElementById('ssf_yield').value);
+            const ssf_is_compound = document.getElementById('ssf_is_compound').checked;
+
+            const thaiesg = parseRawValue(document.getElementById('thaiesg_current').value);
+            const thaiesg_dca = parseRawValue(document.getElementById('thaiesg_dca').value);
+            const thaiesg_yield = parseRawValue(document.getElementById('thaiesg_yield').value);
+            const thaiesg_is_compound = document.getElementById('thaiesg_is_compound').checked;
+
+            const salary = parseRawValue(document.getElementById('salary').value);
+            const pvd_emp = parseRawValue(document.getElementById('pvd_emp').value);
+            const pvd_employer = parseRawValue(document.getElementById('pvd_employer').value);
+            const pvd_dca = salary * ((pvd_emp + pvd_employer) / 100);
+
+            document.getElementById('txtPvdTotalMonthly').innerText = `ยอดเข้ากองทุนรวม: ${formatTwoDecimals(pvd_dca)} บาท/เดือน`;
+
+            const assets = [
+                { name: 'เงินสด / เงินฝาก', current: cash, dca: cash_dca, yield: cash_yield, is_compound: cash_is_compound },
+                { name: 'กองทุนสำรองเลี้ยงชีพ (PVD)', current: pvd, dca: pvd_dca, yield: pvd_yield, is_compound: pvd_is_compound },
+                { name: 'เงินในสหกรณ์', current: coop, dca: coop_dca, yield: coop_yield, is_compound: coop_is_compound },
+                { name: 'RMF', current: rmf, dca: rmf_dca, yield: rmf_yield, is_compound: rmf_is_compound },
+                { name: 'SSF', current: ssf, dca: ssf_dca, yield: ssf_yield, is_compound: ssf_is_compound },
+                { name: 'Thai ESG', current: thaiesg, dca: thaiesg_dca, yield: thaiesg_yield, is_compound: thaiesg_is_compound }
+            ];
+
+            // ถ้ายอมรับให้นำพอร์ตจำลองไปคำนวณรวมด้วย
+            if (document.getElementById('custom_include').checked) {
+                assets.push({
+                    name: '✨ ' + (document.getElementById('custom_name').value || 'พอร์ตจำลอง'),
+                    current: parseRawValue(document.getElementById('custom_current').value),
+                    dca: parseRawValue(document.getElementById('custom_dca').value),
+                    yield: parseRawValue(document.getElementById('custom_yield').value),
+                    is_compound: document.getElementById('custom_is_compound').checked
+                });
+            }
+
+            const totalNetWorth = assets.reduce((sum, item) => sum + item.current, 0);
+            const totalDCA = assets.reduce((sum, item) => sum + item.dca, 0);
+
+            document.getElementById('txtTotalNetWorth').innerText = formatTwoDecimals(totalNetWorth);
+            document.getElementById('txtTotalDCA').innerText = formatTwoDecimals(totalDCA);
+
+            const baseColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1'];
+
+            if (assetChart) {
+                assetChart.data.labels = assets.map(item => item.name);
+                assetChart.data.datasets[0].data = assets.map(item => item.current);
+                assetChart.data.datasets[0].backgroundColor = assets.map((_, i) => baseColors[i % baseColors.length]);
+                assetChart.update();
+            }
+
+            const tbody = document.getElementById('breakdownTableBody');
+            tbody.innerHTML = '';
+
+            assets.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/50 transition';
+                
+                const compoundText = item.yield > 0 ? (item.is_compound ? '(ทบต้น)' : '(ไม่ทบต้น)') : '';
+                const colorCode = baseColors[index % baseColors.length];
+
+                tr.innerHTML = `
+                    <td class="py-3 px-2 font-medium text-slate-700 flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full inline-block flex-shrink-0" style="background-color: ${colorCode}"></span>
+                        <span class="truncate max-w-[90px] sm:max-w-full">${item.name}</span>
+                    </td>
+                    <td class="py-3 px-2 text-right text-slate-600">${formatTwoDecimals(item.current)}</td>
+                    <td class="py-3 px-2 text-right font-medium text-emerald-600">+${formatTwoDecimals(item.dca)}</td>
+                    <td class="py-3 px-2 text-right font-semibold text-violet-600 leading-tight">
+                        ${formatTwoDecimals(item.yield)}%<br>
+                        <span class="text-[9px] font-normal text-slate-400">${compoundText}</span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            return assets;
+        }
+
+        // ฟังก์ชันคำนวณกล่องจำลองเดี่ยวๆ (เพื่อโชว์ในกล่อง Simulator)
+        function calculateCustomPlayground() {
+            const current = parseRawValue(document.getElementById('custom_current').value);
+            const dca = parseRawValue(document.getElementById('custom_dca').value);
+            const yld = parseRawValue(document.getElementById('custom_yield').value);
+            const isCompound = document.getElementById('custom_is_compound').checked;
+            const years = parseRawValue(document.getElementById('custom_years').value);
+
+            const m = years * 12;
+            let futureValue = current + (dca * m);
+            let interestGained = 0;
+
+            if (yld > 0 && m > 0) {
+                const monthlyRate = (yld / 100) / 12;
+                if (isCompound) {
+                    const fvCurrent = current * Math.pow(1 + monthlyRate, m);
+                    const fvDCA = dca * ((Math.pow(1 + monthlyRate, m) - 1) / monthlyRate);
+                    futureValue = fvCurrent + fvDCA;
+                } else {
+                    interestGained = monthlyRate * ( (current * m) + (dca * m * (m - 1) / 2) );
+                    futureValue = current + (dca * m) + interestGained;
+                }
+            }
+
+            const totalCost = current + (dca * m);
+            const profit = futureValue - totalCost;
+
+            document.getElementById('customResultTotal').innerText = formatTwoDecimals(futureValue);
+            document.getElementById('customResultProfit').innerText = '+' + formatTwoDecimals(profit);
+        }
+
+        function calculateForecast(assets) {
+            const forecastVal = document.getElementById('forecastDate').value;
+            const inflationRate = parseRawValue(document.getElementById('inflationRate').value) / 100;
+            let diffMonths = 0;
+
+            if (forecastVal) {
+                const [fYear, fMonth] = forecastVal.split('-');
+                const targetDate = new Date(fYear, fMonth - 1);
+                const now = new Date();
+                
+                diffMonths = (targetDate.getFullYear() - now.getFullYear()) * 12 + (targetDate.getMonth() - now.getMonth());
+                if (diffMonths < 0) diffMonths = 0;
+            }
+
+            document.getElementById('txtDiffMonths').innerText = `ระยะเวลาสะสม: ${diffMonths} เดือน (${formatTwoDecimals(diffMonths/12)} ปี)`;
+
+            const tbody = document.getElementById('forecastTableBody');
+            tbody.innerHTML = '';
+
+            let sumPrincipalCost = 0;
+            let sumInterestGained = 0;
+            let sumTotalForecast = 0;
+            const baseColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1'];
+
+            assets.forEach((item, index) => {
+                const m = diffMonths;
+                const years = m / 12;
+                
+                const principalCost = item.current + (item.dca * m);
+                let futureValue = principalCost; 
+                let interestGained = 0;
+                
+                if (item.yield > 0 && m > 0) {
+                    const annualRate = item.yield / 100;
+                    const monthlyRate = annualRate / 12;
+                    
+                    if (item.is_compound) {
+                        const fvCurrent = item.current * Math.pow(1 + monthlyRate, m);
+                        const fvDCA = item.dca * ((Math.pow(1 + monthlyRate, m) - 1) / monthlyRate);
+                        futureValue = fvCurrent + fvDCA;
+                    } else {
+                        interestGained = monthlyRate * ( (item.current * m) + (item.dca * m * (m - 1) / 2) );
+                        futureValue = principalCost + interestGained;
+                    }
+                }
+
+                if (forecastMode === 'real' && years > 0) {
+                    futureValue = futureValue / Math.pow(1 + inflationRate, years);
+                }
+
+                interestGained = futureValue - principalCost;
+
+                sumPrincipalCost += principalCost;
+                sumInterestGained += interestGained;
+                sumTotalForecast += futureValue;
+                
+                const interestColorClass = interestGained < 0 ? 'text-rose-500' : 'text-violet-500';
+                const interestPrefix = interestGained < 0 ? '' : '+';
+                const compoundIndicator = item.yield > 0 ? (item.is_compound ? ' <span class="text-[9px] text-slate-400">(ทบต้น)</span>' : ' <span class="text-[9px] text-slate-400">(ไม่ทบต้น)</span>') : '';
+                const colorCode = baseColors[index % baseColors.length];
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-100/50 transition';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-slate-700 flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full inline-block flex-shrink-0" style="background-color: ${colorCode}"></span>
+                        <div class="flex flex-col">
+                            <span class="truncate max-w-[100px] sm:max-w-full">${item.name}</span>
+                            ${compoundIndicator}
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-right text-slate-600 font-medium">${formatTwoDecimals(principalCost)}</td>
+                    <td class="py-3 px-4 text-right ${interestColorClass}">${interestPrefix}${formatTwoDecimals(interestGained)}</td>
+                    <td class="py-3 px-4 text-right font-bold text-blue-700">${formatTwoDecimals(futureValue)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const totalIntColorClass = sumInterestGained < 0 ? 'text-rose-500' : 'text-violet-600';
+            const totalIntPrefix = sumInterestGained < 0 ? '' : '+';
+            
+            document.getElementById('fcTotalPrincipal').innerText = formatTwoDecimals(sumPrincipalCost);
+            document.getElementById('fcTotalInterest').className = `py-4 px-4 text-right ${totalIntColorClass}`;
+            document.getElementById('fcTotalInterest').innerText = totalIntPrefix + formatTwoDecimals(sumInterestGained);
+            document.getElementById('fcTotalForecast').innerText = formatTwoDecimals(sumTotalForecast);
+        }
+    </script>
+</body>
+</html>
