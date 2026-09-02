@@ -429,6 +429,7 @@
 
         window.onload = function() {
             loadData();
+            
             const dataAsOfEl = document.getElementById('dataAsOf');
             if (dataAsOfEl && !dataAsOfEl.value) {
                 const today = new Date();
@@ -437,7 +438,67 @@
 
             initChart();
             calculateAll();
+            
+            // เรียกฟังก์ชันตรวจสอบและนำเสนอการบวกข้อมูลล่วงหน้า (Auto Roll-Forward)
+            setTimeout(checkAutoCatchUp, 500); 
         };
+
+        // --- ฟังก์ชัน Auto Roll-Forward อัจฉริยะ ---
+        function checkAutoCatchUp() {
+            const savedDate = localStorage.getItem('dataAsOf');
+            if (!savedDate) return; // ถ้าเป็นการเปิดแอปครั้งแรก (ไม่มีข้อมูลเก่า) ให้ข้ามไป
+
+            const today = new Date();
+            const currMonthStr = today.toISOString().slice(0, 7);
+
+            if (savedDate < currMonthStr) {
+                const [sYear, sMonth] = savedDate.split('-').map(Number);
+                const [cYear, cMonth] = currMonthStr.split('-').map(Number);
+                
+                const diffMonths = (cYear - sYear) * 12 + (cMonth - sMonth);
+                
+                if (diffMonths > 0) {
+                    // เด้ง Confirm ถามผู้ใช้ก่อน ป้องกันการทำลายข้อมูลเก่าโดยไม่ตั้งใจ
+                    const wantToUpdate = window.confirm(
+                        `⏳ พบว่าข้อมูลพอร์ตล่าสุดคือเดือน ${savedDate} (ผ่านมา ${diffMonths} เดือน)\n\n` +
+                        `คุณต้องการให้ระบบนำเงินลงทุน (DCA) สะสม ${diffMonths} เดือน\n` +
+                        `บวกเพิ่มเข้าไปในเงินต้นปัจจุบันของทุกสินทรัพย์อัตโนมัติหรือไม่?\n\n` +
+                        `(หมายเหตุ: เมื่อกดตกลง ข้อมูลจะถูกอัปเดตเป็นเดือนปัจจุบัน และคุณสามารถไปแก้ตัวเลขเศษปันผล/ดอกเบี้ยเพิ่มเติมทีหลังได้)`
+                    );
+
+                    if (wantToUpdate) {
+                        const prefixes = ['cash', 'pvd', 'coop', 'rmf', 'ssf', 'thaiesg', 'custom'];
+                        
+                        prefixes.forEach(prefix => {
+                            let currentEl = document.getElementById(`${prefix}_current`);
+                            let dcaEl = document.getElementById(`${prefix}_dca`);
+                            
+                            let dcaVal = 0;
+                            if (prefix === 'pvd') {
+                                // คำนวณ DCA ของ PVD จากเงินเดือน
+                                const salary = parseRawValue(document.getElementById('salary').value);
+                                const pvd_emp = parseRawValue(document.getElementById('pvd_emp').value);
+                                const pvd_employer = parseRawValue(document.getElementById('pvd_employer').value);
+                                dcaVal = salary * ((pvd_emp + pvd_employer) / 100);
+                            } else if (dcaEl) {
+                                dcaVal = parseRawValue(dcaEl.value);
+                            }
+
+                            if (currentEl && dcaVal > 0) {
+                                const oldCurrent = parseRawValue(currentEl.value);
+                                const newCurrent = oldCurrent + (dcaVal * diffMonths);
+                                currentEl.value = formatTwoDecimals(newCurrent);
+                            }
+                        });
+
+                        // อัปเดตเดือนปัจจุบันให้ทันสมัย
+                        document.getElementById('dataAsOf').value = currMonthStr;
+                        saveAndCalculate();
+                        alert('✅ อัปเดตยอดเงิน DCA สะสมเข้าพอร์ตให้เรียบร้อยแล้วครับ!');
+                    }
+                }
+            }
+        }
 
         function shareSummary() {
             const dataAsOf = document.getElementById('dataAsOf').value || '-';
@@ -575,7 +636,7 @@
         }
 
         function onInputChange(el) {
-            if(el.id === 'custom_name') { saveAndCalculate(); return; } // ไม่ต้องดักตัวเลขสำหรับช่องชื่อ
+            if(el.id === 'custom_name') { saveAndCalculate(); return; } 
             let val = el.value.replace(/[^0-9.]/g, '');
             const dotCount = (val.match(/\./g) || []).length;
             if (dotCount > 1) val = val.substring(0, val.length - 1);
@@ -597,7 +658,7 @@
         }
 
         function onInputFocus(el) {
-            if(el.id === 'custom_name') return; // ข้ามการ clear ลูกน้ำสำหรับช่องข้อความ
+            if(el.id === 'custom_name') return;
             const raw = parseRawValue(el.value);
             el.value = raw === 0 ? '' : raw.toString();
         }
@@ -644,9 +705,9 @@
                     }
                 } else {
                     if (el.type === 'checkbox') {
-                        el.checked = true; // ค่าเริ่มต้นให้ทบต้นทั้งหมด
-                        if (id === 'coop_is_compound') el.checked = false; // ยกเว้นสหกรณ์ให้ค่าเริ่มต้นเป็น ไม่ทบต้น
-                        if (id === 'custom_include') el.checked = false; // ค่าเริ่มต้นของพอร์ตจำลองคือไม่เอามารวม
+                        el.checked = true;
+                        if (id === 'coop_is_compound') el.checked = false;
+                        if (id === 'custom_include') el.checked = false; 
                     } else if (el.type === 'text' && id === 'custom_name') {
                         el.value = 'พอร์ตจำลอง';
                     } else if (id === 'retirementAge') { el.value = '60.00'; }
@@ -693,7 +754,7 @@
             calculateAgeAndTime();
             const assets = updatePortfolio();
             calculateForecast(assets);
-            calculateCustomPlayground(); // จำลองผลลัพธ์พอร์ตย่อย
+            calculateCustomPlayground();
         }
 
         function calculateAgeAndTime() {
@@ -743,9 +804,9 @@
             assetChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: [], // กำหนดผ่าน updatePortfolio
+                    labels: [],
                     datasets: [{
-                        data: [], // กำหนดผ่าน updatePortfolio
+                        data: [],
                         backgroundColor: [],
                         borderWidth: 2, borderColor: '#ffffff'
                     }]
@@ -804,7 +865,6 @@
                 { name: 'Thai ESG', current: thaiesg, dca: thaiesg_dca, yield: thaiesg_yield, is_compound: thaiesg_is_compound }
             ];
 
-            // ถ้ายอมรับให้นำพอร์ตจำลองไปคำนวณรวมด้วย
             if (document.getElementById('custom_include').checked) {
                 assets.push({
                     name: '✨ ' + (document.getElementById('custom_name').value || 'พอร์ตจำลอง'),
@@ -858,7 +918,6 @@
             return assets;
         }
 
-        // ฟังก์ชันคำนวณกล่องจำลองเดี่ยวๆ (เพื่อโชว์ในกล่อง Simulator)
         function calculateCustomPlayground() {
             const current = parseRawValue(document.getElementById('custom_current').value);
             const dca = parseRawValue(document.getElementById('custom_dca').value);
